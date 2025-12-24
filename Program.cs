@@ -1,15 +1,22 @@
 using CarvedRockFitness.Components;
 using CarvedRockFitness.Services;
 using CarvedRockFitness.Repositories;
-using Microsoft.Extensions.Logging.AzureAppServices;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Razor / Blazor
+// ===============================
+// Razor / Blazor Server
+// ===============================
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Session
+// ===============================
+// Session (Blazor Server = stateful)
+// ===============================
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -20,27 +27,28 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// --------------------
-// LOGGING (CORRECTO)
-// --------------------
+// ===============================
+// LOGGING (FORMA SOPORTADA .NET 8)
+// ===============================
 builder.Logging.ClearProviders();
+
+// Conecta ILogger con Azure App Service (stdout / log streaming)
 builder.Logging.AddAzureWebAppDiagnostics();
 
 // Nivel global
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
-// Filtro explícito para App Service providers
-builder.Logging.AddFilter<AzureFileLoggerProvider>(null, LogLevel.Information);
-builder.Logging.AddFilter<AzureBlobLoggerProvider>(null, LogLevel.Information);
+// Filtro por categoría de la app (CLAVE)
+builder.Logging.AddFilter("CarvedRockFitness", LogLevel.Information);
 
-// Reduce ruido
+// Reduce ruido del framework
 builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
 builder.Logging.AddFilter("System", LogLevel.Warning);
 
-// --------------------
-// Repositorios
-// --------------------
-string connectionString =
+// ===============================
+// Repositorios y servicios
+// ===============================
+string? connectionString =
     builder.Configuration.GetConnectionString("DefaultConnection")
     ?? Environment.GetEnvironmentVariable("DefaultConnection");
 
@@ -59,7 +67,9 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
 var app = builder.Build();
 
+// ===============================
 // Pipeline HTTP
+// ===============================
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -75,6 +85,9 @@ app.UseRouting();
 app.UseSession();
 app.UseAntiforgery();
 
+// ===============================
+// Blazor endpoints
+// ===============================
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
