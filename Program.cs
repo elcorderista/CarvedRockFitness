@@ -36,10 +36,14 @@ builder.Services.AddScoped<ShoppingCartService>();
 builder.Services.AddSingleton<CartEventService>();
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
-
 builder.Logging.ClearProviders();
 builder.Logging.AddAzureWebAppDiagnostics();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+builder.Services.Configure<AzureFileLoggerOptions>(options =>
+{
+    options.MinLevel = LogLevel.Information;
+});
 
 
 var app = builder.Build();
