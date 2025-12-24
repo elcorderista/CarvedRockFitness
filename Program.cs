@@ -28,22 +28,30 @@ builder.Services.AddSession(options =>
 });
 
 // ===============================
-// LOGGING (FORMA SOPORTADA .NET 8)
+// LOGGING (MEJORADO PARA AZURE)
 // ===============================
 builder.Logging.ClearProviders();
 
-// Conecta ILogger con Azure App Service (stdout / log streaming)
+// Console para Azure App Service Log Stream
+builder.Logging.AddConsole();
+
+// Azure Web App Diagnostics (clave para Azure)
 builder.Logging.AddAzureWebAppDiagnostics();
+
+// Debug en desarrollo local
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddDebug();
+}
 
 // Nivel global
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
-// Filtro por categoría de la app (CLAVE)
+// Filtros por categoría
 builder.Logging.AddFilter("CarvedRockFitness", LogLevel.Information);
-
-// Reduce ruido del framework
 builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
 builder.Logging.AddFilter("System", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting", LogLevel.Information); // Ver startup
 
 // ===============================
 // Repositorios y servicios
@@ -68,6 +76,19 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 var app = builder.Build();
 
 // ===============================
+// LOGS DE INICIO (PARA VERIFICAR)
+// ===============================
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("========================================");
+logger.LogInformation("CarvedRockFitness Application Starting");
+logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("Connection String Configured: {HasConnection}", 
+    !string.IsNullOrEmpty(connectionString));
+logger.LogInformation("Repository: {RepositoryType}", 
+    string.IsNullOrEmpty(connectionString) ? "InMemory" : "SQL");
+logger.LogInformation("========================================");
+
+// ===============================
 // Pipeline HTTP
 // ===============================
 if (app.Environment.IsDevelopment())
@@ -90,5 +111,7 @@ app.UseAntiforgery();
 // ===============================
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+logger.LogInformation("Application configured successfully. Starting web host...");
 
 app.Run();
