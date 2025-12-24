@@ -5,10 +5,11 @@ using Microsoft.Extensions.Logging.AzureAppServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Razor / Blazor
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Session
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -19,10 +20,30 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+// --------------------
+// LOGGING (CORRECTO)
+// --------------------
+builder.Logging.ClearProviders();
 builder.Logging.AddAzureWebAppDiagnostics();
 
-// Register ICartRepository based on connection string, or use in-memory cart
-string connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? Environment.GetEnvironmentVariable("DefaultConnection");
+// Nivel global
+builder.Logging.SetMinimumLevel(LogLevel.Information);
+
+// Filtro explícito para App Service providers
+builder.Logging.AddFilter<AzureFileLoggerProvider>(null, LogLevel.Information);
+builder.Logging.AddFilter<AzureBlobLoggerProvider>(null, LogLevel.Information);
+
+// Reduce ruido
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("System", LogLevel.Warning);
+
+// --------------------
+// Repositorios
+// --------------------
+string connectionString =
+    builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DefaultConnection");
+
 if (!string.IsNullOrEmpty(connectionString))
 {
     builder.Services.AddScoped<ICartRepository, SqlCartRepository>();
@@ -34,21 +55,11 @@ else
 
 builder.Services.AddScoped<ShoppingCartService>();
 builder.Services.AddSingleton<CartEventService>();
-
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
-builder.Logging.ClearProviders();
-builder.Logging.AddAzureWebAppDiagnostics();
-builder.Logging.SetMinimumLevel(LogLevel.Information);
-
-builder.Services.Configure<AzureFileLoggerOptions>(options =>
-{
-    options.MinLevel = LogLevel.Information;
-});
-
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Pipeline HTTP
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -63,7 +74,6 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseSession();
 app.UseAntiforgery();
-
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
